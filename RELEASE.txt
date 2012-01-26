@@ -1,0 +1,152 @@
+01-19-2012
+release 2.42
+1. corrected the methylation ratio extraction for overlapping paired hits. (for SAM output only) 
+   nucleotides in overlapped part will be counted once instead of twice.
+
+01-11-2012
+release 2.4
+1. optimized seed patterns, up to 40% faster than v2.3.
+2. change -z option from -z <char> to -z <int>, since the zero quality char '!' is a special char in linux shell
+    -z @ is now -z 64 (solexa quality)
+    -z "!" is now -z 33 (sanger quality), which is the default setting.
+3. added -L <int> option to map the first N nucleotides of a read.
+4. re-wrote the methratio.py script, much faster and use less memory (~26GB) for
+whole genome methylation ratio extraction.  
+    changed the syntax of options:
+        ref=<ref_file> is changed to -d <ref_file> or --ref=<ref_file>
+        chrom=<chr> is changed to -c <chr> or --chr=<chr>
+    added options:
+        -u, --unique    process only unique mappings
+        -p, --pair      process only paired mappings
+        -s, --sam-path  set the path to samtools 
+
+12-12-2011
+release 2.3
+1. added -M <str> option to allow other special alignments instead of C=>T bisulfite
+alignment, for example, -M GA could used to detect A=>I editing in RNA-seq.  
+2. added -n <int> option to set mapping strand information.  -n 0 only map reads to 2
+forward strands, and -n 1 map reads to all 4 possible strands
+3. the output reference sequence were expanded by two nucleotide (in lower
+cases) to include seqeunce context information. (ie, CG, CHG or CHH)
+4. added two options for the methratio.py script.  
+	chrom=<chr>	select the chromosomes to process, so that large
+	dataset could be broken into chromosomes to use less RAM.
+	ref=<ref_file>	specify the reference fasta file when the BSMAP output
+	does not include reference sequence.
+
+08-18-2011
+release 2.2
+1. rewrote the genome index to reduce the memory usage. (from 13G to 8.5G for human genome shotgun mapping).
+2. samtools library was reverted back to 0.1.7a for compatibility on PowerPC platform.
+
+05-20-2011
+release 2.1
+1. trimm short adapter sequences for properly paired mappings.
+2. optimized seed ordering and RRBS mode indexing.
+
+05-13-2011
+release 2.01
+1. report identical reads name for pair-end reads. 
+
+release 2.0
+05-04-2011
+1. added -D <str> option for RRBS mapping mode, i.e. "-D C-CGG" to specify the
+digestion site information in RRBS.
+2. added -S <int> to set random seed in multiple hits selection
+3. fixed a bug in reporting quality chars when the input uses non-sanger quality
+4. pair-end module is optimized to be 3 times faster than 1.x version 
+
+release: 1.25
+04-20-2011
+1. corrected the 0x40/0x80 flag in SAM format output.
+
+release: 1.2
+04-12-2011
+1. added option '-I' to specify index interval, allowing memory/sensitivity trade off.
+2. corrected the sign of insert_size of the right most read in pair-end mapping.
+3. added command line syntax '-x=<val>', in additionl to the old '-x <val>' syntax.
+
+release: 1.15
+04-08-2011
+1. optimized indexing and alignment with cache prefetching.
+2. updated methratio.py script for methylation ratio calling.
+
+release: 1.12
+03-29-2011
+1. add SAM/BAM format input.
+2. optimized the seed table and pair-end module.
+3. resolved the compilatin issue with GCC4.3+.
+
+release: 1.08
+01-05-2011
+1. fixed a bug in reporting strand info in SAM format output.
+2. updated the methylation ratio calling script.
+
+release: 1.07
+09-08-2010
+1. fixed a bug in matching pair-end strands.
+
+release: 1.06
+08-27-2010
+1. pair-end module was rewritten
+2. added SAM format output, and added insertion size for paired mapping in BSP format output
+3. output mode option -j was removed
+4. seed segment number option -k was removed, seed segment number will be calculated as (read_len-3)/seed_size
+
+release: 1.02
+12-21-20-9
+1. fix a bug for 96 bp reads mapping
+2. index mode option -i is removed 
+
+release: 1.0
+10-25-2009
+1. extended supported max read length to 96bp and max seed size to 16 bp
+2. modified output format, added position informtaion of mythyC and non-methyC
+3. added option of choose seed segment numbers to allo 2+ mismatches at full sensitivity
+4. optimized the hash table structure and greatly improved the speed. (e.g. 10X faster for 60bp+ reads)
+5. rewrote user manual (README.txt)
+6. gap alignment and index mode are depreciated and will be removed in next release
+
+release: 0.99
+08-13-2009
+1. fixed a bug of overflow at the end of BSC reference sequence.
+
+release: 0.98
+08-10-2009
+1. fixed a bug in methratio.py that may underestimate the methylation ratio.
+2. small optimizations to improve the maping speed, especially for reads longer than 48bp. 
+
+release: 0.97
+07-24-2009
+1. added downstream tool (methratio.py) to calculate the methylation ratios from mapping results. 
+2. fixed a bug of not recording the best match in a rare condition.
+
+release: 0.96
+06-24-2009
+1. added downstream tool (bsmap2wig.py) to convert mapping resluts to WIG file for visualization.
+2. fixed a bug of counting duplicated mappings.
+
+release: 0.94
+05-05-2009
+1. integrated rc-genome tool wcref into the main program bsmap.
+2. adjusted output format for the strand information:
+        '++': aligned to BSW, the forward strand of Watson strand of reference. 
+        '+-': aligned to BSWC, the reverse complementary strand of Watson strand of reference.
+        '-+': aligned to BSC, the forward strand of Crick strand of reference. 
+        '--': aligned to BSCC, the reverse complementary strand of Crick strand of reference.        
+3. all alignment positions are now referring to the 5'-end coordinates of the mapping region on the Watson strand of reference sequence, all cordinates are 1-based. Formally mappings on BSC/BSCC are 5'-end coordinates on Crick strand of reference.
+    
+release: 0.93
+04-30-2009
+1. change the 4-segment seeding to 3-segment seeding to reduce memory usage.
+2. combine bsmap.a and bsmap.b into bsmap, adding new parameter -i to distinguish different index mode.
+3. added CpG mode that only searches methylated C in CpG context. (index mode -i 2)
+
+release: 0.91
+03-30-2009
+1. first formal release with documents.
+2. included genome conversion tool wcref.
+
+release: 0.9
+11-05-2008
+1. testing version.
