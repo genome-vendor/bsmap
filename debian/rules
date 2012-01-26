@@ -1,0 +1,13 @@
+#!/usr/bin/make -f
+
+PKG=$(shell dh_listpackages)
+VERSION=2.42
+
+%:
+	dh $@
+
+override_dh_auto_install:
+	dh_auto_install
+	for FILE in ./debian/$(PKG)/usr/bin/*; do \
+	  mv $$FILE ./debian/$(PKG)/usr/bin/`basename $$FILE`$(VERSION); \
+	done
