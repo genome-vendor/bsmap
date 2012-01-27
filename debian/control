@@ -1,12 +1,12 @@
 Source: bsmap2.42 
 Section: science
 Priority: optional
-Build-Depends: debhelper (>= 7)
+Build-Depends: debhelper (>= 7), zlib1g-dev
 Maintainer: The Genome Insitute <gmt@genome.wustl.edu>
 Homepage: http://code.google.com/p/bsmap/
 
 Package: bsmap2.42
 Architecture: amd64
-Depends: 
+Depends: zlib1g
 Description: BSMAP is a short reads mapping software for bisulfite sequencing reads. Bisulfite treatment converts unmethylated Cytosines into Uracils (sequenced as Thymine) and leave methylated Cytosines unchanged, hence provides a way to study DNA cytosine methylation at single nucleotide resolution. BSMAP aligns the Ts in the reads to both Cs and Ts in the reference.
 
