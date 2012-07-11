@@ -33,6 +33,10 @@ public:
 	int TrimLowQual();
 	void ConvertBinaySeq();
 	inline void GenerateSeeds(int n, int start);
+	inline void GenerateCSeeds(int n, int cstart);
+    int CountSeeds(RefSeq &ref, int n, int start);
+    int CountCSeeds(RefSeq &ref, int n, int cstart);
+	
 	//inline void GenerateSeeds_2(int n);
 	//inline void GenerateSeeds_3(int n);
 	inline unsigned int CountMismatch(bit64_t *q, bit64_t *r, bit64_t *s);
@@ -60,6 +64,9 @@ public:
     void Fix_Unpaired_Short_Fragment(RefSeq &ref);
     void ReorderSeed(RefSeq &ref);
     bit32_t GetTotalSeedLoc(RefSeq &ref, int start);
+    bit32_t GetTotalCSeedLoc(RefSeq &ref, int start);
+    void AdjustSeedStartArray(RefSeq &ref);
+    void AdjustCSeedStartArray(RefSeq &ref);
 
 public:
 
@@ -71,12 +78,17 @@ public:
 
 	bit32_t seeds[MAXSNPS+1][16];
 	bit32_t cseeds[MAXSNPS+1][16];
+	
+	bit32_t seed_array[144];
+	bit32_t cseed_array[144];
 
 	int _cur_n_hit[MAXSNPS+1];
 	int _cur_n_chit[MAXSNPS+1];
 
 	bit32_t snp_thres;
-	bit32_t seed_start_offset;
+	bit32_t rand_rSeed; // thread safe RNG seed
+	int seed_start_offset, cseed_start_offset;
+	int seed_start_array[MAXSNPS+1], cseed_start_array[MAXSNPS+1];
 	bit32_t cseed_offset;
     set<ref_loc_t> *hitset; //, *chitset; 
     vector<pair<int,int> > seedindex, cseedindex;
@@ -93,9 +105,9 @@ public:
 	//Hit chits[MAXSNPS+1][MAXHITS+1];
 	HitArray *hits, *chits;
 
-
     //cold data section
 	int _format;
+    bool flag_chain, cflag_chain;	
 	vector<ReadInf>::iterator _pread;
 	string _ori_read_seq;
 	string _ori_read_qual;
@@ -126,46 +138,31 @@ public:
 inline void SingleAlign::GenerateSeeds(int n, int start)
 {
 	int i;
-	bit32_t a, b1, s1;
  	//cout<<"cseed_offset="<<cseed_offset<<endl;
 
     if(param.RRBS_flag){
     	_pro=param.profile[n];
-    	a=_pro->a+start;
-	b1=a/SEGLEN;
-	s1=SEGLEN*4-(param.seed_size+a%SEGLEN)*2;
-    	                        
-        if(s1>=(SEGLEN*2))	seeds[n][0]=param.XT((((bit64_t)bseq[0][b1])>>(s1-(SEGLEN*2)))&param.seed_bits);
-        else seeds[n][0]=param.XT((((bit64_t)bseq[0][b1])<<((SEGLEN*2)-s1)|bseq[0][b1+1]>>s1)&param.seed_bits);
-
-    	a=_pro->a+cseed_offset+start;
-    	b1=a/SEGLEN;
-    	s1=SEGLEN*4-(param.seed_size+a%SEGLEN)*2;
-
-        if(s1>=(SEGLEN*2)) cseeds[n][0]=param.XT((((bit64_t)cbseq[0][b1])>>(s1-(SEGLEN*2)))&param.seed_bits);
-        else cseeds[n][0]=param.XT((((bit64_t)cbseq[0][b1])<<((SEGLEN*2)-s1)|cbseq[0][b1+1]>>s1)&param.seed_bits);
-
+    	seeds[n][0]=seed_array[_pro->a+start];
     }
-    else{            
-    	for(i=0,_pro=param.profile[n];i<param.index_interval;i++,_pro++){
-    	        a=_pro->a+start;             
-		b1=a/SEGLEN;
-		s1=SEGLEN*4-(param.seed_size+a%SEGLEN)*2;
-    	                        
-        	seeds[n][i]=s1>=(SEGLEN*2)? (((bit64_t)bseq[i][b1])>>(s1-(SEGLEN*2)))&param.seed_bits : 
-                (((bit64_t)bseq[i][b1])<<((SEGLEN*2)-s1)|bseq[i][b1+1]>>s1)&param.seed_bits;
-        	cseeds[n][i]=s1>=(SEGLEN*2)? (((bit64_t)cbseq[i][b1])>>(s1-(SEGLEN*2)))&param.seed_bits : 
-                (((bit64_t)cbseq[i][b1])<<((SEGLEN*2)-s1)|cbseq[i][b1+1]>>s1)&param.seed_bits;
-                
-            //cout<<"n:"<<n<<" i:"<<i<<" "<<param.StrSeed(seeds[n][i],16)<<endl;
-        }
-        
-    	for(int i=0; i<param.index_interval; i++){
-    	    seeds[n][i]=param.XT(seeds[n][i]);
-    	    cseeds[n][i]=param.XT(cseeds[n][i]);
-    	}
+    else{ 
+        for(i=0,_pro=param.profile[n];i<param.index_interval;i++,_pro++) seeds[n][i]=seed_array[_pro->a+start-i];
     }
 }
+
+inline void SingleAlign::GenerateCSeeds(int n, int cstart)
+{
+	int i;
+ 	//cout<<"cseed_offset="<<cseed_offset<<endl;
+
+    if(param.RRBS_flag){
+    	_pro=param.profile[n];
+        cseeds[n][0]=cseed_array[_pro->a+cseed_offset+cstart];
+    }
+    else{ 
+        for(i=0,_pro=param.profile[n];i<param.index_interval;i++,_pro++) cseeds[n][i]=cseed_array[_pro->a+cstart-i];
+    }
+}
+
 
 inline unsigned int SingleAlign::CountMismatch(register bit64_t *q, register bit64_t *r, register bit64_t *s)
 {
@@ -173,17 +170,6 @@ inline unsigned int SingleAlign::CountMismatch(register bit64_t *q, register bit
 #ifdef READ_48
     return param.XM64((*q&param.XC64(*s)^*s)&*r)+param.XM64((*(q+1)&param.XC64(*(s+1))^*(s+1))&*(r+1));
 
-
-    /*    
-    return param.XM64((*((bit64_t*)q+1)&param.XC64(*((bit64_t*)s+1))^*((bit64_t*)s+1))&*((bit64_t*)r+1))
-    +param.XM64((*((bit64_t*)q)&param.XC64(*((bit64_t*)s))^*((bit64_t*)s))&*((bit64_t*)r));
-	if((tmp_snp=param.XM((*(q+2)&param.XC(*(s+2))^*(s+2))&*(r+2)))>snp_thres)
-        return tmp_snp;
-    if ((tmp_snp+=param.XM((*(q+1)&param.XC(*(s+1))^*(s+1))&*(r+1)))>snp_thres)
-        return tmp_snp;
-    return tmp_snp+param.XM((*q&param.XC(*s)^*s)&*r)
-            +param.XM(((*q+3)&param.XC((*s+3))^(*s+3))&(*r+3));
-    */
 #endif
 #ifdef READ_80
 
@@ -199,21 +185,6 @@ inline unsigned int SingleAlign::CountMismatch(register bit64_t *q, register bit
 */
 #endif
 #ifdef READ_144
-/*
-if((tmp_snp=param.XM64((*((bit64_t*)q)&param.XC64(*((bit64_t*)s))^*((bit64_t*)s))&*((bit64_t*)r)))>snp_thres)
-        return tmp_snp;
-
-    if((tmp_snp+=param.XM64((*((bit64_t*)q+1)&param.XC64(*((bit64_t*)s+1))^*((bit64_t*)s+1))&*((bit64_t*)r+1)))>snp_thres)
-        return tmp_snp;
-
-    return tmp_snp+param.XM64((*((bit64_t*)q+2)&param.XC64(*((bit64_t*)s+2))^*((bit64_t*)s+2))&*((bit64_t*)r+2))
-           +param.XM64((*((bit64_t*)q+3)&param.XC64(*((bit64_t*)s+3))^*((bit64_t*)s+3))&*((bit64_t*)r+3))
-           +param.XM64((*((bit64_t*)q+4)&param.XC64(*((bit64_t*)s+4))^*((bit64_t*)s+4))&*((bit64_t*)r+4));
-*/
-
-    //for(int i=0;i<10;i++) disp_bfa(*((bit32_t*)q+i)); cout<<endl;
-    //for(int i=0;i<10;i++) disp_bfa(*((bit32_t*)s+i)); cout<<endl;
-    //for(int i=0;i<10;i++) disp_bfa(*((bit32_t*)r+i)); cout<<endl;
 
     if((tmp_snp=param.XM64((*q&param.XC64(*s)^*s)&*r))>snp_thres)
         return tmp_snp;

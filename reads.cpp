@@ -39,7 +39,11 @@ void ReadClass::CheckFile(ifstream &fin, string filename, int mode)
 	}
 	else if((SAM_fp=samopen(filename.c_str(), "rb", 0))!=0) {
     	SAM_b=bam_init1();
-	    _file_format=2; //BAM format
+	    _file_format=3; //BAM format
+	}
+	else if((SAM_fp=samopen(filename.c_str(), "r", 0))!=0) {
+    	SAM_b=bam_init1();
+	    _file_format=2; //SAM format
 	}
 	else {
 		cerr<<"fatal error: unrecognizable format of reads file.\n";
@@ -86,7 +90,7 @@ int ReadClass::LoadBatchReads(ifstream &fin, int readset)  // readset {0: single
 	char *s, *t;
 	
 	if (_file_format<2) //.fa and .fq format
-    	for(num=0; num<BatchNum; p++,num++,_index++){
+    	for(num=0; num<BatchNum && _index<param.read_end; p++,num++,_index++){
 		if(_index>=param.read_end) break;
     		fin>>c;
     		if(fin.eof()) break;
@@ -100,6 +104,7 @@ int ReadClass::LoadBatchReads(ifstream &fin, int readset)  // readset {0: single
 	    		fin.getline(ch, 1000);
 	    		fin>>p->qual;
 	    	}
+	    	//else p->qual=string(1,'*');
 	    	else p->qual=string(p->seq.size(), param.zero_qual+param.default_qual);
 	    	/*
 	    	cout<<p->qual<<endl;
@@ -111,9 +116,8 @@ int ReadClass::LoadBatchReads(ifstream &fin, int readset)  // readset {0: single
                 p->seq.erase(param.max_readlen); p->qual.erase(param.max_readlen);
             }
 	    }
-	else //BAM format
-    	for(num=0; num<BatchNum; num++,p++,_index++){
-		if(_index>=param.read_end) break;
+	else //SAM/BAM format
+    	for(num=0; num<BatchNum && _index<param.read_end; num++,p++,_index++){
 		//cout<< "index:"<<_index<<endl;
             //cout<<"num:"<<num<<"  mode:"<<mode<<endl;
             if(readset==2) if (samread(SAM_fp,SAM_b)<0) break;

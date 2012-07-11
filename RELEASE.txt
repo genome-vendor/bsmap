@@ -1,3 +1,29 @@
+04-09-2012
+release 2.6
+1. optimized seed patterns for mapping speed.
+2. improved pair-end mapping sensitivity slightly.
+3. do not report unmapped reads by default, add option -u to report unmapped reads.
+4. use thread safe random number generator in selecting multiple mappings.
+5. add 95% confidence interval for eatimated methylation ratios in the methratio.py output.
+6. add options in methratio.py script 
+	-t, --trim-fillin	trim fill-in nucleotides in end-repairing.
+	-r, --remove-duplicate	remove duplicated hits to reduce PCR bias.
+  	-g, --combine-CpG     	combine CpG methylaion ratios from both strands.
+	-m, --min-depth		report loci with sequencing depth >= FOLD
+
+03-14-2012
+release 2.5
+1. restore option -r [0,1] to report multiple mapped reads:
+    -r 0: only report unique mapped reads
+    -r 1: report one random hit if multiple hits has the least number of mismatches
+2. set the default number of threads (-p opition) to the number of CPU cores detected (up to 8).  
+3. execute sam2bam.sh and samtools in system default path for BAM format output.
+4. added python script bsp2sam.py to convert BSP format output to SAM format.
+
+01-27-2012
+release 2.43
+1. fixed a bug in methratio.py
+
 01-19-2012
 release 2.42
 1. corrected the methylation ratio extraction for overlapping paired hits. (for SAM output only) 

@@ -11,6 +11,7 @@ PairAlign::PairAlign()
     pairhits = new PairArray[2*MAXSNPS+1];
     _str_align.reserve(BatchNum*400);
     _str_align_unpair.reserve(BatchNum*400);
+    rand_rSeed=getpid()*time(NULL);
 }
 
 PairAlign::~PairAlign() {
@@ -34,14 +35,27 @@ int PairAlign::GetPairs(int na, int nb)
 {
 	int i,j,insert_size,bstart,bend;
     ref_loc_t seg_start,seg_end;
+    if(na>_sa.read_max_snp_num||nb>_sb.read_max_snp_num) return 0;
 	PairHit pp;
 	pp.na=na;pp.nb=nb;
 	//_sa.SortHits4PE(na);
 	//_sb.SortHits4PE(nb);
     ref_id_t chra;
 
-
-    //cout<<"na:"<<na<<" nb:"<<nb<<endl;
+/*
+    cout<<"na:"<<na<<endl;
+    cout<<"f:"<<_sa._cur_n_hit[na]<<endl;
+    for(i=0;i<_sa._cur_n_hit[na]; i++) cout<<"chr"<<(int)_sa.hits[na][i].chr<<":"<<_sa.hits[na][i].loc<<endl;
+    cout<<"r:"<<_sa._cur_n_chit[na]<<endl;
+    for(i=0;i<_sa._cur_n_chit[na]; i++) cout<<"chr"<<(int)_sa.chits[na][i].chr<<":"<<_sa.chits[na][i].loc<<endl;
+        
+    cout<<"nb:"<<nb<<endl;
+    cout<<"f:"<<_sb._cur_n_hit[nb]<<endl;
+    for(i=0;i<_sb._cur_n_hit[nb]; i++) cout<<"chr"<<(int)_sb.hits[nb][i].chr<<":"<<_sb.hits[nb][i].loc<<endl;
+    cout<<"r:"<<_sb._cur_n_chit[nb]<<endl;
+    for(i=0;i<_sb._cur_n_chit[nb]; i++) cout<<"chr"<<(int)_sb.chits[nb][i].chr<<":"<<_sb.chits[nb][i].loc<<endl;
+*/
+             
 	//a+ vs b-
 	pp.chain=0; checked_pair_mismatch[na][nb]=1;
     chra=~0; bstart=0; bend=0;
@@ -122,27 +136,17 @@ int PairAlign::GetPairs(int na, int nb)
 
 int PairAlign::RunAlign(RefSeq &ref)
 {
-	int n,i,j,na=-1,nb=-1,seedseg_num;
-    /*
-    if(param.report_repeat_hits==2){
-    	for(i=0; i<=param.max_snp_num*2; i++){
-            _cur_n_hits[i]=0;
-    	    for(j=0;(j<=param.max_snp_num)&&(j<=i);j++){
-    	       if ((i-j)>param.max_snp_num) continue; 
-    	       if (GetPairs(j,i-j)) return i+1;
-    	    }        
-    	}
-        return 0;
-    }
-    */
+	int n,i,j,k,na=-1,nb=-1,seedseg_num;
+
     for(i=0; i<=param.max_snp_num*2; i++) _cur_n_hits[i]=0;
     for(i=0; i<=param.max_snp_num; i++) for(j=0; j<=param.max_snp_num; j++) checked_pair_mismatch[i][j]=0;
 
 	_sa.ClearHits();
 	_sb.ClearHits();
-                        	
-	_sa.seedseg_num=min((int)(_sa._pread->seq.size()/param.seed_size),(int)_sa.read_max_snp_num+1);
-	_sb.seedseg_num=min((int)(_sb._pread->seq.size()/param.seed_size),(int)_sb.read_max_snp_num+1);
+
+	_sa.seedseg_num=min((int)((_sa._pread->seq.size()-param.index_interval+1)/param.seed_size),(int)_sa.read_max_snp_num+1);
+	_sb.seedseg_num=min((int)((_sb._pread->seq.size()-param.index_interval+1)/param.seed_size),(int)_sb.read_max_snp_num+1);
+
     seedseg_num=max(_sa.seedseg_num,_sb.seedseg_num);
 	_sa.ConvertBinaySeq();
 	_sb.ConvertBinaySeq();
@@ -153,37 +157,33 @@ int PairAlign::RunAlign(RefSeq &ref)
         //cout<<"_sa "; for (int ii=0; ii<= param.max_snp_num;ii++) cout<<' '<<_sa._cur_n_hit[ii]<<' '<<_sa._cur_n_chit[ii]<<' '; cout<<endl;
         //cout<<"_sb "; for (int ii=0; ii<= param.max_snp_num;ii++) cout<<' '<<_sb._cur_n_hit[ii]<<' '<<_sb._cur_n_chit[ii]<<' '; cout<<endl;
         //cout<<endl;
-        _sa.ReorderSeed(ref); _sb.ReorderSeed(ref);                
-	for(i=0; i<seedseg_num; i++){
+        _sa.ReorderSeed(ref); _sb.ReorderSeed(ref);
+        int maxi=max((int)_sa.read_max_snp_num,(int)_sb.read_max_snp_num);                
+	//for(i=0; i<=_sa.read_max_snp_num+_sb.read_max_snp_num; i++){
+	for(i=0; i<=maxi; i++){
 	    //cout << "i="<<i<<endl;
-	    if(i<_sa.seedseg_num) {
-            //cout<< "  a\n";
-    		//_sa.GenerateSeeds_1(i);
-            _sa.SnpAlign(ref,i);
-            na=i; _sa.SortHits4PE(na);
-            //cout<<"_sa "; for (int ii=0; ii<= param.max_snp_num;ii++) cout<<' '<<_sa._cur_n_hit[ii]<<' '<<_sa._cur_n_chit[ii]<<' '; cout<<endl;
-            //cout<<"_sb "; for (int ii=0; ii<= param.max_snp_num;ii++) cout<<' '<<_sb._cur_n_hit[ii]<<' '<<_sb._cur_n_chit[ii]<<' '; cout<<endl;
-            for(j=0; j<=nb; j++) if(GetPairs(i,j)) return i+j+1; 
-        }
-        if(i<_sb.seedseg_num) {
-            //cout<<" b\n";
-            //_sb.GenerateSeeds_1(i);
-            _sb.SnpAlign(ref,i);
-            nb=i; _sb.SortHits4PE(nb);
-            //cout<<"_sa "; for (int ii=0; ii<= param.max_snp_num;ii++) cout<<' '<<_sa._cur_n_hit[ii]<<' '<<_sa._cur_n_chit[ii]<<' '; cout<<endl;
-            //cout<<"_sb "; for (int ii=0; ii<= param.max_snp_num;ii++) cout<<' '<<_sb._cur_n_hit[ii]<<' '<<_sb._cur_n_chit[ii]<<' '; cout<<endl; 
-            for(j=0; j<=na; j++) if(GetPairs(j,i)) return i+j+1; 
-        }        
+        if(i<_sa.seedseg_num) _sa.SnpAlign(ref,i); 
+        if(i<_sb.seedseg_num) _sb.SnpAlign(ref,i);
+        if(i<=_sa.read_max_snp_num) _sa.SortHits4PE(i);
+        if(i<=_sb.read_max_snp_num) _sb.SortHits4PE(i);       
+        n=GetPairs(i,i); 
+        for(j=0; j<i; j++) n+=GetPairs(i,j)+GetPairs(j,i); 
+        if(n>0) return i+1;
 	}
 
-    for(; na<=_sa.read_max_snp_num; na++) _sa.SortHits4PE(na);
-    for(; nb<=_sb.read_max_snp_num; nb++) _sb.SortHits4PE(nb);
-    //cout<<"check all combinations\n";
-   	for(i=0; i<=2*param.max_snp_num; i++) for(j=0;(j<=param.max_snp_num)&&(j<=i);j++){
-   	       if ((i-j)>param.max_snp_num) continue; 
-           if(checked_pair_mismatch[j][i-j]) continue;
-   	       if (GetPairs(j,i-j)) return i+1;
- 	}
+/*
+    PairHit pp;
+    cout<<_sa._pread->name.c_str()<<endl;
+    for(i=0; i<=param.max_snp_num*2; i++) if(_cur_n_hits[i]) {
+        cout<<"mis:"<<i<<"  pairs:"<<_cur_n_hits[i]<<endl;
+        for(j=0;j<_cur_n_hits[i];j++) {
+            pp=pairhits[i][j];
+            cout<<ref.title[pp.a.chr].name<<":"<<pp.a.loc+1<<":"<<chain_flag[pp.a.chr%2]<<chain_flag[pp.chain]<<endl;
+            cout<<ref.title[pp.b.chr].name<<":"<<pp.b.loc+1<<":"<<chain_flag[pp.b.chr%2]<<chain_flag[!pp.chain]<<endl;
+        }
+    }
+    return 1;
+*/
 
     //cout <<"nothing\n";
 	return 0;		
@@ -193,7 +193,7 @@ void PairAlign::Do_Batch(RefSeq &ref)
 {
 	_str_align.clear();
 	_str_align_unpair.clear();
-	int tt=0,i,j;
+	int tt=0,i,j,tmp;
 	int filter1, filter2, paired;
     for(_sa._pread=_sa.mreads.begin(), _sb._pread=_sb.mreads.begin(); tt<num_reads; _sa._pread++, _sb._pread++, tt++) {
         //if(_sa._pread->seq.size()==_sb._pread->seq.size()) TrimAdapter();
@@ -210,12 +210,8 @@ void PairAlign::Do_Batch(RefSeq &ref)
             if(filter2==0) _sb.RunAlign(ref);
         }
         //cout<<"pair:"<<paired<<endl;
-        if(paired) {n_aligned_pairs++; StringAlignPair(ref, _str_align);}
-		else {
-		    if(filter1==0) 
-                for(i=0; i<=param.max_snp_num; i++) if(_sa._cur_n_hit[i]||_sa._cur_n_chit[i]) {n_aligned_a++; break;}
-   		    if(filter2==0) 
-                for(j=0; j<=param.max_snp_num; j++) if(_sb._cur_n_hit[j]||_sb._cur_n_chit[j]) {n_aligned_b++; break;}
+        if(paired) tmp=StringAlignPair(ref, _str_align);
+        if(tmp==1||paired==0) {   
    		    if(param.out_sam) StringAlignUnpair(filter1, filter2, ref, _str_align);
    		    else StringAlignUnpair(filter1, filter2, ref, _str_align_unpair);
         }    
@@ -223,7 +219,7 @@ void PairAlign::Do_Batch(RefSeq &ref)
 //	cout<<_str_align<<endl;
 }
 
-void PairAlign::StringAlignPair(RefSeq &ref, string &os)
+int PairAlign::StringAlignPair(RefSeq &ref, string &os)
 {
 	_sa.Reverse_Seq();
 	_sa.Reverse_Qual();
@@ -233,19 +229,16 @@ void PairAlign::StringAlignPair(RefSeq &ref, string &os)
 	for(i=0; i<=param.max_snp_num*2; i++) {
 		if(0==_cur_n_hits[i]) continue;
 		if(1==_cur_n_hits[i]) {
-		    s_OutHitPair(pairhits[i][0], 1, ref, os);
+		    s_OutHitPair(pairhits[i][0], 1, ref, os); return 0;
 		}
 		else if(1==param.report_repeat_hits) {   //randomly pick up one
-			j=myrand(_sa._pread->index)%_cur_n_hits[i];
+			j=myrand(_sa._pread->index, &rand_rSeed)%_cur_n_hits[i];
 		    s_OutHitPair(pairhits[i][j], _cur_n_hits[i], ref, os);
+		    return 0;
 		}
-		else if(2==param.report_repeat_hits) {   //output all repeat hits
-			for(j=0; j<_cur_n_hits[i]; j++) {
-			    s_OutHitPair(pairhits[i][j], _cur_n_hits[i], ref, os);
-			}
-		}
-		return;
+	    return 1; //non-unique pair
 	}
+    return 1; //no pair
 }
 
 void PairAlign::StringAlignUnpair(int fa, int fb, RefSeq &ref, string &os)
@@ -265,37 +258,31 @@ void PairAlign::StringAlignUnpair(int fa, int fb, RefSeq &ref, string &os)
     na=nb=ra=rb=0; ma=mb=-1;
     if(!fa) {
         for(na=0; na<=_sa.read_max_snp_num; na++) if((ma=_sa._cur_n_hit[na]+_sa._cur_n_chit[na])>0) break;
-        if(ma) {ra=myrand(_sa._pread->index)%ma; ha=(ra<_sa._cur_n_hit[na])? _sa.hits[na][ra]:_sa.chits[na][ra-_sa._cur_n_hit[na]];}
+        if(ma) {
+            if(ma>1) ra=myrand(_sa._pread->index, &rand_rSeed)%ma; 
+            ha=(ra<_sa._cur_n_hit[na])? _sa.hits[na][ra]:_sa.chits[na][ra-_sa._cur_n_hit[na]];
+        }
         na%=(_sa.read_max_snp_num+1);     
     }
 
     if(!fb) {
         for(nb=0; nb<=_sb.read_max_snp_num; nb++) if((mb=_sb._cur_n_hit[nb]+_sb._cur_n_chit[nb])>0) break;
-        if(mb) {rb=myrand(_sb._pread->index)%mb; hb=(rb<_sb._cur_n_hit[nb])? _sb.hits[nb][rb]:_sb.chits[nb][rb-_sb._cur_n_hit[nb]];}
+        if(mb) {
+            if(mb>1) rb=myrand(_sb._pread->index, &rand_rSeed)%mb; 
+            hb=(rb<_sb._cur_n_hit[nb])? _sb.hits[nb][rb]:_sb.chits[nb][rb-_sb._cur_n_hit[nb]];
+        }
         nb%=(_sb.read_max_snp_num+1);
     }
-
+/*
     switch(param.report_repeat_hits){
     case 0:
         if(ma==1) s_OutHitUnpair(0, (ra>=_sa._cur_n_hit[na]), (rb>=_sb._cur_n_hit[nb]), ma, na, ha, mb, hb, ref, os);
         if(mb==1) s_OutHitUnpair(1, (rb>=_sb._cur_n_hit[nb]), (ra>=_sa._cur_n_hit[na]), mb, nb, hb, ma, ha, ref, os);
         break;
     case 1:
-        s_OutHitUnpair(0, (ra>=_sa._cur_n_hit[na]), (rb>=_sb._cur_n_hit[nb]), ma, na, ha, mb, hb, ref, os);
-        s_OutHitUnpair(1, (rb>=_sb._cur_n_hit[nb]), (ra>=_sa._cur_n_hit[na]), mb, nb, hb, ma, ha, ref, os);
-       	break;
-    case 2:
-        if(ma<=0) s_OutHitUnpair(0, (ra>=_sa._cur_n_hit[na]), (rb>=_sb._cur_n_hit[nb]), ma, na, ha, mb, hb, ref, os);
-        else{
-	    for(j=0; j<_sa._cur_n_hit[na]; j++) s_OutHitUnpair(0, (ra>=_sa._cur_n_hit[na]), (rb>=_sb._cur_n_hit[nb]), ma, na, _sa.hits[na][j], mb, hb, ref, os);
-	    for(j=0; j<_sa._cur_n_chit[na]; j++) s_OutHitUnpair(0, (ra>=_sa._cur_n_hit[na]), (rb>=_sb._cur_n_hit[nb]), ma, na, _sa.chits[na][j], mb, hb, ref, os);
-        }
-        if(mb<=0) s_OutHitUnpair(1, (rb>=_sb._cur_n_hit[nb]), (ra>=_sa._cur_n_hit[na]), mb, nb, ha, ma, hb, ref, os);
-        else{
- 	    for(j=0; j<_sb._cur_n_hit[nb]; j++) s_OutHitUnpair(1, (rb>=_sb._cur_n_hit[nb]), (ra>=_sa._cur_n_hit[na]), mb, nb, _sb.hits[nb][j], ma, ha, ref, os);
-            for(j=0; j<_sb._cur_n_chit[nb]; j++) s_OutHitUnpair(1, (rb>=_sb._cur_n_hit[nb]), (ra>=_sa._cur_n_hit[na]), mb, nb, _sb.chits[nb][j], ma, ha, ref, os);
-	}
-    }
+*/
+    s_OutHitUnpair(0, (ra>=_sa._cur_n_hit[na]), (rb>=_sb._cur_n_hit[nb]), ma, na, ha, mb, hb, ref, os);
+    s_OutHitUnpair(1, (rb>=_sb._cur_n_hit[nb]), (ra>=_sa._cur_n_hit[na]), mb, nb, hb, ma, ha, ref, os);
 }
 
 void PairAlign::s_OutHitPair(PairHit pp, int n, RefSeq &ref, string &os) {
@@ -305,17 +292,17 @@ void PairAlign::s_OutHitPair(PairHit pp, int n, RefSeq &ref, string &os) {
 
     //if fraglen < readlen then we need to remove adapter sequence
 
-
+    n_aligned_pairs++;
     if(pp.insert<_sa._pread->seq.size()){ 
         if(pp.chain^(pp.a.chr%2)) pp.a.loc+=_sa._pread->seq.size()-pp.insert;
         _sa._pread->seq.erase(pp.insert);
-        _sa._pread->qual.erase(pp.insert);
+        if(_sa._pread->qual.size()>pp.insert) _sa._pread->qual.erase(pp.insert);
     }
 
     if(pp.insert<_sb._pread->seq.size()){
         if((!pp.chain)^(pp.b.chr%2)) pp.b.loc+=_sb._pread->seq.size()-pp.insert;
         _sb._pread->seq.erase(pp.insert);
-        _sb._pread->qual.erase(pp.insert);
+        if(_sb._pread->qual.size()>pp.insert) _sb._pread->qual.erase(pp.insert);
     }
 
 
@@ -442,9 +429,12 @@ void PairAlign::s_OutHitUnpair(int readinpair, int chain_a, int chain_b, int ma,
     if(readinpair==0) _stmp=&_sa; else _stmp=&_sb;
     if(param.out_sam){
         flag|=0x40*_stmp->_pread->readset;
-        if(ma<=0){ //QC, NM
-            if(ma<0) flag|=0x204; else flag|=0x004; 
-            if(mb<=0) {
+        if((ma<=0)||(ma>1&&param.report_repeat_hits==0)){ //QC, NM
+            if(!param.out_unmap) return;
+            if(ma<0) flag|=0x204; 
+            if(ma==0) flag|=0x004; 
+            if(ma>1) flag|=0x104;
+            if(mb<=0||mb>1&&param.report_repeat_hits==0) {
                 flag|=0x008;
            	    sprintf(_ch,"%s\t%d\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n",_stmp->_pread->name.c_str(),flag,_stmp->_pread->seq.c_str(),_stmp->_pread->qual.c_str()); 
            	}
@@ -455,6 +445,7 @@ void PairAlign::s_OutHitUnpair(int readinpair, int chain_a, int chain_b, int ma,
             os.append(_ch);                
         }           	    
         else{
+            if(readinpair==0) n_aligned_a++; else n_aligned_b++;
             if(ma>1) flag|=0x100; //MA, OF
             if(chain_a^(ha.chr%2)){
                 flag|=0x010; //reverse read sequence
@@ -462,7 +453,7 @@ void PairAlign::s_OutHitUnpair(int readinpair, int chain_a, int chain_b, int ma,
                 for(ii=0;ii<_stmp->_pread->seq.size();ii++) _stmp->_pread->seq[ii]=rev_char[_stmp->_pread->seq[ii]];
       	    	reverse(_stmp->_pread->qual.begin(), _stmp->_pread->qual.end());
             }
-                      if(mb<=0) {
+                      if(mb<=0||mb>1&&param.report_repeat_hits==0) {
                 flag|=0x008;
                 sprintf(_ch,"%s\t%d\t%s\t%u\t255\t%dM\t*\t0\t0\t%s\t%s\tNM:i:%d",
                     _stmp->_pread->name.c_str(),flag,ref.title[ha.chr].name.c_str(),ha.loc+1,_stmp->_pread->seq.size(),_stmp->_pread->seq.c_str(),_stmp->_pread->qual.c_str(),na);
@@ -499,11 +490,6 @@ void PairAlign::s_OutHitUnpair(int readinpair, int chain_a, int chain_b, int ma,
             sprintf(_ch,"\tZS:Z:%c%c\n", chain_flag[ha.chr%2], chain_flag[chain_a]); 
             os.append(_ch);
 
-            if(chain_a^(ha.chr%2)&&param.report_repeat_hits>1){
-               	reverse(_stmp->_pread->seq.begin(), _stmp->_pread->seq.end());
-                for(ii=0;ii<_stmp->_pread->seq.size();ii++) _stmp->_pread->seq[ii]=rev_char[_stmp->_pread->seq[ii]];
-      	    	reverse(_stmp->_pread->qual.begin(), _stmp->_pread->qual.end());
-            }
         }
     }
     else{

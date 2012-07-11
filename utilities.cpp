@@ -37,9 +37,8 @@ char * Curr_Time()
 
 //generate randomness
 
-bit32_t myrand(int i)
-{
-	if(param.randseed == 0) return rand();
+bit32_t myrand(int i, bit32_t* rseed) {
+	if(param.randseed == 0) return rand_r(rseed);
 	else{
 		bit64_t v;
     	v = ((bit64_t) i+ param.randseed*1000000) * 3935559000370003845LL + 2691343689449507681LL;

@@ -62,10 +62,11 @@ option:
 -v  <int>   max number of mismatches allowed on a read, default=2, max=15, 
             usually this number should be around 10% of the read length.
 -w  <int>   max number of equal best hits to count, smaller will be faster, default=MAXHITS in makefile
+-r  [0,1]   how to report repeat hits, 0=none(unique hit/pair only); 1=random one, default=1.
 -q  <int>   quality threshold in trimming 3'end of reads, 0-40, default=0. (no trim)
 -z  <int>   base quality, default=33 [Illumina is using 64, Sanger Institute is using 33]
 -f  <int>   filter low-quality reads containing >n Ns, default=5
--p  <int>   number of processors to use, default=1. The parallel performance scales well with 8 threads or less.
+-p  <int>   number of processors to use, default=4. The parallel performance scales well with 8 threads or less.
             For more than 8 threads, there might be no significant overall speed gain.
 -x  <int>   max insertion size for pair end mapping, default=500
 -m  <int>   min insertion size for pair end mapping, default=28
@@ -78,6 +79,7 @@ option:
             Multiple -A options could be specified to set more than one adapter sequences, i.e. in pair-end sequencing case. 
             default: none (no adapter trimming)
 -R          include the reference sequences as the XR:Z:<string> field in SAM output. default=do not include.
+-u          report unmapped reads, default=do not report.
 -B  <int>   start from the Nth read or read pair, default: 1.
 -E  <int>   end at the Nth read or read pair, default: 4,294,967,295.
             Using -B and -E options user can specify part of the input file to be mapped, so that the input file 
@@ -153,9 +155,8 @@ id, seq, qual map_flag, ref, ref_loc, strand, ins_size, refseq, #mismatches, mis
     for more details, please refer to SAM format specification: 
     http://samtools.sourceforge.net/SAM1.pdf
 
-**Note: all read sequences are recorded as the corresponding sequence following the reference Watson strand direction.
+Note: all read sequences are recorded as the corresponding sequence following the reference Watson strand direction.
 
- 
 
 5. Speed and sensitivity
     
@@ -183,7 +184,7 @@ for shot gun whole genome BS:
 	$bsmap -a SE_read.bam -d ~/ref/hg19/hg19.fa -o out.bam -n 1 -w 100 -v 5
 
 	pair_end: (set -b option)
-        $ bsmap -a read1.fq -b read2.fq -d ~/ref/hg19/hg19.fa -o out_pair.bsp -2 out_upair.bsp -p 8 -w 100  -v 5 
+    $ bsmap -a read1.fq -b read2.fq -d ~/ref/hg19/hg19.fa -o out_pair.bsp -2 out_upair.bsp -p 8 -w 100  -v 5 
 	$ bsmap -a PE_reads.bam -b PE_reads.bam -d ~/ref/hg19/hg19.fa -o out.bam -p 8 -w 100  -v 5 -A AGATCGGAAGAGCGGTTCAGCAGGAATGCCGAGA
 
 	using less memory: (set -I option)
@@ -194,6 +195,9 @@ for shot gun whole genome BS:
 
 	using Illumina quality: (set -z option)
 	$ bsmap -a PE_read1.fq -b PE_read2.fq -d ~/ref/hg19/hg19.fa -o out.bam -z 64
+	
+	report only uniquely mapped reads: (set -r option)
+	$ bsmap -a reads.fastq -d hg19.fa -o out.bsp -r 0
 
 	trimming low quality 3'end: (set -q option)
 	$ bsmap -a PE_reads.bam -b PE_reads.bam -d ~/ref/hg19/hg19.fa -o out.bam -q 2
@@ -216,6 +220,10 @@ and combine results for all chromosomes afterwards.
 
 Usage: python methratio.py [options] BSMAP_MAPPING_FILES
 
+BSMAP_MAPPING_FILES could be one or more output files from BSMAP.
+The format will be determined by the filename suffix. 
+(SAM format for *.sam and *.bam, BSP format for other filenames.)
+
 Options:
   -h, --help            show this help message and exit
   -o FILE, --out=FILE   output file name. (required)
@@ -228,6 +236,18 @@ Options:
   -p, --pair            process only properly paired mappings.
   -z, --zero-meth       report loci with zero methylation ratios.
   -q, --quiet           don't print progress on stderr.
+  -r, --remove-duplicate
+                        remove duplicated mappings to reduce PCR bias. 
+			(This option should not be used on RRBS data. For WGBS, sometimes 
+			it's hard to tell if duplicates are caused by PCR due to high seqeuncing depth.)
+  -t N, --trim-fillin=N
+                        trim N fill-in nucleotides in DNA fragment end-repairing. [default:2] 
+			(This option is only for pair-end mapping. For RRBS, N could be detetmined by the distance between
+                        cuttings sites on forward and reverse strands. For WGBS, N is usually between 0~3.) 
+  -g, --combine-CpG     combine CpG methylaion ratio from both strands. [default: False]
+  -m FOLD, --min-depth=FOLD
+                        report loci with sequencing depth>=FOLD. [default: 1]
+
 
 Output format: tab delimited txt file with the following columns:
     1) chromorome
@@ -235,12 +255,17 @@ Output format: tab delimited txt file with the following columns:
     3) strand
     4) sequence context (2nt upstream to 2nt downstream in Watson strand direction)
     5) methylation ratio
-    6) number of reads covering this locus 
-    7) number of unconverted Cs in the reads at this locus
+    6) number of converted and unconverted Cs covering this locus 
+    7) number of unconverted Cs covering this locus
+    8) lower bound of 95% confidence interval of methylation ratio
+    9) upper bound of 95% confidence interval of methylation ratio
+
+The confidence interval is based on Wilson score interval for binomial proportion.
 
 Example:
-	python methratio.py --chr=chr1,chr2 --ref=hg19.fa --out=methratio.txt rrbsmap_sample*.sam
+    python methratio.py --chr=chr1,chr2 --ref=hg19.fa --out=methratio.txt rrbsmap_sample*.sam
     python methratio.py -d mm9.fa -o meth.txt -p bsmap_sample1.bsp bsmap_sample2.sam bsmap_sample3.bam 
+    python methratio.py -s /home/tools/samtools -t 1 -d arab.fa -o meth.txt bsmap_sample.sam
 
 Note: For overlapping paired hits, nucleotides in the overlapped part should be counted only once instead of twice.
 methratio.py can correctly handle such cases for SAM format output, but for BSP format it will still be counted twice,
@@ -250,12 +275,29 @@ because the BSP format does not contain mapping information of the mate.
 7.2 sam2bam.sh
 Shell script to convert SAM format to sorted and indexed BAM format.
 The input SAM file will be deleted if the conversion is successful.
-This script is automatically called by BSMAP if the output file has .bam suffix.  It can also be used manually.
+This script is automatically called by BSMAP if the output file has .bam suffix, which requires samtools and sam2bam.sh installed in system default path.  
+It can also be used manually.
 
 Usage: ./sam2bam.sh INPUT_SAM_FILE
-example: ./sam2bam.sh sample1.sam 
+
+Example: ./sam2bam.sh sample1.sam 
 This will generate sorted BAM file sample1.bam and index file sample1.bam.bai. 
 
+
+7.3 bsp2sam.py
+Python script to convert .BSP format output to SAM format output. 
+
+Usage: bsp2sam.py [options] BSP_FILE
+
+Options:
+  -h, --help           show this help message and exit
+  -o FILE, --out=FILE  output file name. (required) 
+  -d FILE, --ref=FILE  reference genome fasta file. (required)
+  -q, --quiet          don't print progress on stderr.
+
+Example: python bsp2sam.py -d hg19.fa -o sample.sam sample.bsp
+
+Note: For pair-end BSP output, this script will conver it into single-end SAM output, i.e. the mapping information remains, but the pairing information lost. 
 
 
 8. Citation

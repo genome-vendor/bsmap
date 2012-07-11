@@ -66,7 +66,7 @@ public:
 public:
 	int num_procs;  //number of parallel processors
 	
-	int chains;   //0: both; 1: direct only; 2: complementary only
+	int chains;   //0: forward strands only ; 1: forward and reverse strands
 	//dbseq
 	int max_dbseq_size;
 	int append_dbseq_size;
@@ -106,12 +106,11 @@ public:
     //bit16_t *map4to3; //map 3-letter sequence to 3-based number
 	int CCGG_min, CCGG_max;
 	int out_sam;
-    //int fast_mode;
-    //int RRBS_check;
     int total_ref_seq;    
     int max_seedseg_num;
     bit32_t read_start, read_end;
     int out_ref;
+    int out_unmap;
     string digest_site; 
     int digest_pos; 
     int RRBS_flag;

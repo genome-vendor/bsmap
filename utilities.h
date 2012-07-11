@@ -14,7 +14,7 @@ time_t Cal_AllTime();
 //current time on string format
 char * Curr_Time();
 
-bit32_t myrand(int i);
+bit32_t myrand(int i, bit32_t * rseed);
 bool HitComp(Hit a, Hit b);
 bool HitComp2(Hit a, Hit b);
 bool HitCompChr(Hit a, Hit b);

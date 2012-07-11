@@ -1,7 +1,7 @@
 CC=	g++
 
 BIN = $(DESTDIR)/usr/bin
-FLAGS= -DMAXHITS=100 -DTHREAD -funroll-loops -Lsamtools -Isamtools -O3
+FLAGS= -DMAXHITS=1000 -DTHREAD -funroll-loops -Lsamtools -Isamtools -O3
 
 OLIGOLEN= -DREAD_144
 # options: -DREAD_48, -DREAD_80, -DREAD_144
@@ -26,3 +26,5 @@ clean:
 install:
 	install -d $(BIN)
 	install ./bsmap $(BIN)
+	install ./sam2bam.sh $(BIN)
+	install ./methratio.py $(BIN)

@@ -40,7 +40,7 @@ bit32_t n_aligned=0;   //number of reads aligned
 bit32_t n_aligned_pairs=0;  //number of pairs aligned
 bit32_t n_aligned_a=0;  //number of a reads aligned
 bit32_t n_aligned_b=0;  //number of b reads aligned
-char version[] = "2.42";
+char version[] = "2.6";
 
 #ifdef THREAD
 pthread_mutex_t mutex_fin=PTHREAD_MUTEX_INITIALIZER;
@@ -148,7 +148,6 @@ void Do_SingleAlign()
 
 void Do_PairAlign()
 {
-	//if(param.max_snp_num>0) param.max_snp_num=2;	
 	read_a.CheckFile(fin_a, query_a_file.c_str(), 2);
 	read_b.CheckFile(fin_b, query_b_file.c_str(), 2);
 	PairAlign a;
@@ -186,21 +185,19 @@ cout<<"Usage:	bsmap [options]\n"
 		<<"       -a  <str>   query a file, FASTA/FASTQ/BAM format\n"
 		<<"       -d  <str>   reference sequences file, FASTA format\n"
 		<<"       -o  <str>   output alignment file, BSP/SAM/BAM format\n"
+		<<"\n  Options for alignment:\n"
 		<<"       -s  <int>   seed size, default=16(WGBS mode), 12(RRBS mode). min=8, max=16.\n"
 		<<"       -v  <int>   maximum number of mismatches allowed on a read, <="<<MAXSNPS<<". default="<<param.max_snp_num<<".\n"
 		<<"       -w  <int>   maximum number of equal best hits to count, <="<<MAXHITS<<"\n"
-		<<"       -q  <int>   quality threshold in trimming, 0-40, default=0 (no trim)\n"
-		<<"       -z  <int>   base quality, default="<<(int) param.zero_qual<<" [Illumina is using 64, Sanger Institute is using 33]\n"
-		<<"       -f  <int>   filter low-quality reads containing >n Ns, default="<<param.max_ns<<"\n"
-        <<"       -A  <str>   3-end adapter sequence, default: none (no trim)\n"
-        <<"       -R          print corresponding reference sequences in SAM output, default=off\n"
         <<"       -B  <int>   start from the Nth read or read pair, default: 1\n"
         <<"       -E  <int>   end at the Nth read or read pair, default: 4,294,967,295\n"
-        <<"       -L  <int>   map the first N nucleotides of the read, default:"<<param.max_readlen<<" (map the whole read).\n"
+       	<<"       -I  <int>   index interval, default="<<param.index_interval<<"\n"        
+#ifdef THREAD
+		<<"       -p  <int>   number of processors to use, default="<<param.num_procs<<"\n"
+#endif	
         <<"       -D  <str>   activating RRBS mapping mode and set restriction enzyme digestion sites. \n"
         <<"                   digestion position marked by \'-\', example: -D C-CGG for MspI digestion.\n"
-        <<"                   default: none (whole genome shotgun bisulfite mapping mode)\n"
-       	<<"       -I  <int>   index interval, default="<<param.index_interval<<"\n"        
+        <<"                   default: none (whole genome shotgun bisulfite mapping mode)\n"        
     	<<"       -S  <int>   seed for random number generation used in selecting multiple hits\n"
         <<"                   other seed values generate pseudo random number based on read index number, to allow reproducible mapping results. \n"
         <<"                   default="<<param.randseed<<". (get seed from system clock, mapping results not resproducible.)\n"
@@ -213,9 +210,16 @@ cout<<"Usage:	bsmap [options]\n"
         <<"                   indicating N1 in the reads could be mapped to N2 in the reference sequences.\n"
         <<"                   default: -M TC, corresponds to C=>U(T) transition in bisulfite conversion. \n"
         <<"                   example: -M GA could be used to detect A=>I(G) transition in RNA editing. \n"
-#ifdef THREAD
-		<<"       -p  <int>   number of processors to use, default="<<param.num_procs<<"\n"
-#endif	
+		<<"\n  Options for trimming:\n"
+		<<"       -q  <int>   quality threshold in trimming, 0-40, default=0 (no trim)\n"
+		<<"       -z  <int>   base quality, default="<<(int) param.zero_qual<<" [Illumina is using 64, Sanger Institute is using 33]\n"
+		<<"       -f  <int>   filter low-quality reads containing >n Ns, default="<<param.max_ns<<"\n"
+        <<"       -A  <str>   3-end adapter sequence, default: none (no trim)\n"
+        <<"       -L  <int>   map the first N nucleotides of the read, default:"<<param.max_readlen<<" (map the whole read).\n"
+		<<"\n  Options for reporting:\n"
+        <<"       -r  [0,1]   how to report repeat hits, 0=none(unique hit/pair only); 1=random one, default:"<<param.report_repeat_hits<<".\n"
+        <<"       -R          print corresponding reference sequences in SAM output, default=off\n"
+        <<"       -u          report unmapped reads, default=off\n"
 		<<"\n  Options for pair-end alignment:\n"
 		<<"       -b  <str>   query b file\n"
 		<<"       -m  <int>   minimal insert size allowed, default="<<param.min_insert<<"\n"
@@ -248,6 +252,7 @@ int mGetOptions(int rgc, char *rgv[])
 			//case 'n': if(rgv[i][2]==0) param.chains = atoi(rgv[++i])%4; else if(rgv[i][2]=='=') param.chains=atoi(rgv[i]+3)%4; else return i; break;
 			case 'n': if(rgv[i][2]==0) param.chains=(atoi(rgv[++i])!=0); else if(rgv[i][2]=='=') param.chains=(atoi(rgv[i]+3)!=0); else return i; break;
 			case 'x': if(rgv[i][2]==0) param.max_insert = atoi(rgv[++i]); else if(rgv[i][2]=='=') param.max_insert=atoi(rgv[i]+3); else return i; break;
+			case 'r': if(rgv[i][2]==0) param.report_repeat_hits = atoi(rgv[++i]); else if(rgv[i][2]=='=') param.report_repeat_hits=atoi(rgv[i]+3); else return i; break;
 			case 'I': if(rgv[i][2]==0) param.index_interval = atoi(rgv[++i]); else if(rgv[i][2]=='=') param.index_interval=atoi(rgv[i]+3); else return i; 
 			    if(param.RRBS_flag) param.index_interval=1;
 			    if(param.index_interval>16) {cerr<<"index interval exceeds max value:16\n"; exit(1);}
@@ -265,6 +270,7 @@ int mGetOptions(int rgc, char *rgv[])
 			case 'A': if(rgv[i][2]==0) param.adapter[param.n_adapter++]=rgv[++i]; else if(rgv[i][2]=='=') param.adapter[param.n_adapter++]=rgv[i]+3; else return i;   
                 break;
             case 'R': if(rgv[i][2]==0) param.out_ref=1; else return i; break;
+            case 'u': if(rgv[i][2]==0) param.out_unmap=1; else return i; break;
 		    case 'B': if(rgv[i][2]==0) param.read_start = max(atoi(rgv[++i]),1); else if(rgv[i][2]=='=') param.read_start=max(atoi(rgv[i]+3),1); else return i; break;
 		    case 'E': if(rgv[i][2]==0) param.read_end = atoi(rgv[++i]); else if(rgv[i][2]=='=') param.read_end=atoi(rgv[i]+3); else return i; break;
 	        case 'D': if(rgv[i][2]==0) param.SetDigestionSite(rgv[++i]); else if(rgv[i][2]=='=') param.SetDigestionSite(rgv[i]+3); else return i; break;
@@ -322,17 +328,17 @@ void RunProcess(void)
 		cout<<"Query: "<<query_a_file<<"  "<<query_b_file<<"  Reference: "<<ref_file<<"  Output: "<<out_align_file<<"  "<<out_align_file_unpair<<endl;
 		fin_a.open(query_a_file.c_str());
 		if(!fin_a) {
-			cerr<<"failed to open file: "<<query_a_file<<endl;
+			cerr<<"failed to open read file #1 (check -a option): "<<query_a_file<<endl;
 			exit(1);
 		}
 		fin_b.open(query_b_file.c_str());
 		if(!fin_b) {
-			cerr<<"failed to open file: "<<query_b_file<<endl;
+			cerr<<"failed to open read file #2 (check -b option): "<<query_b_file<<endl;
 			exit(1);
 		}		
 		fout.open(out_align_file.c_str());
 		if(!fout) {
-			cerr<<"failed to open file: "<<out_align_file<<endl;
+			cerr<<"failed to open output file (check -o option): "<<out_align_file<<endl;
 			exit(1);
 		}
 		if(param.out_sam){
@@ -347,7 +353,7 @@ void RunProcess(void)
         else{
     		fout_unpair.open(out_align_file_unpair.c_str());
 	    	if(!fout_unpair) {
-	    		cerr<<"failed to open file: "<<out_align_file_unpair<<endl;
+	    		cerr<<"failed to open output file for unpaired hits (check -2 option): "<<out_align_file_unpair<<endl;
 	    		exit(1);
 	    	}
 	    }
@@ -379,7 +385,7 @@ void RunProcess(void)
 		if(!query_a_file.empty()) {
 			fin_a.open(query_a_file.c_str());
 			if(!fin_a) {
-				cerr<<"b failed to open file: "<<query_a_file<<endl;
+				cerr<<"failed to open read file (check -a option): "<<query_a_file<<endl;
 				exit(1);
 			}
 		}
@@ -392,7 +398,7 @@ void RunProcess(void)
 		cout<<"Query: "<<query_a_file<<"  Reference: "<<ref_file<<"  Output: "<<out_align_file<<endl;
 		fout.open(out_align_file.c_str());
 		if(!fout) {
-			cerr<<"failed to open file: "<<out_align_file<<endl;
+			cerr<<"failed to open output file (check -o option): "<<out_align_file<<endl;
 			exit(1);
 		}
 		
@@ -459,10 +465,10 @@ int main(int argc, char *argv[])
 	RunProcess();
     if(param.out_sam==2){
 		char sys_cmd[1000], exec_path[1000], abs_bam_file[1000];
-		realpath(argv[0], exec_path);
+		//realpath(argv[0], exec_path);
 		realpath(out_align_file.c_str(), abs_bam_file);
-		*(strrchr(exec_path,'/')+1)=0;
-		sprintf(sys_cmd,"%ssam2bam.sh %s",exec_path,abs_bam_file);
+		//*(strrchr(exec_path,'/')+1)=0;
+		sprintf(sys_cmd,"sam2bam.sh %s",abs_bam_file);
 		system(sys_cmd);
 	}
     ref.ReleaseIndex();

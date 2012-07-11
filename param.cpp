@@ -5,7 +5,8 @@ using namespace std;
 
 Param::Param()
 {
-	num_procs=1;
+	num_procs=sysconf(_SC_NPROCESSORS_ONLN);
+	if(num_procs>8) num_procs=8;
 
 /*	
 #ifdef DB_CHR  // seqs <256, length <4Gb
@@ -70,6 +71,7 @@ Param::Param()
 
     //SetDigestionSite("C-CGG");
     out_ref=0;
+    out_unmap=0;
     RRBS_flag=0;
     index_interval=4;
     randseed=0;

@@ -39,7 +39,7 @@ public:
 	
 	//added by yxi
 	int GetPairs(int na, int nb);
-    void StringAlignPair(RefSeq &ref, string &os);
+    int StringAlignPair(RefSeq &ref, string &os);
 	void StringAlignUnpair(int fa, int fb, RefSeq &ref, string &os);
     void s_OutHitPair(PairHit pp, int n, RefSeq &ref, string &os);
     void s_OutHitUnpair(int readinpair, int chain_a, int chain_b, int ma, int na, Hit ha, int mb, Hit hb, RefSeq &ref, string &os);
@@ -57,7 +57,7 @@ protected:
 	bit32_t _cur_n_hits[2*MAXSNPS+1];
 	//PairHit pairhits[2*MAXSNPS+1][MAXHITS+1];
     PairArray *pairhits;
-	
+    bit32_t rand_rSeed;	//thread safe RNG seed
 	//by yxi
     char _mapseq[256];
     char _ch[1024];  
