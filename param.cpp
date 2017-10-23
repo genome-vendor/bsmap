@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include "param.h"
 #include<iostream>
 
@@ -6,7 +7,8 @@ using namespace std;
 Param::Param()
 {
 	num_procs=sysconf(_SC_NPROCESSORS_ONLN);
-	if(num_procs>8) num_procs=8;
+	if(num_procs>8) num_procs=8;
+
 
 /*	
 #ifdef DB_CHR  // seqs <256, length <4Gb
